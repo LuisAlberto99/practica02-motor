@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(practica02_motor LANGUAGES CXX)
+project(practica03_motor LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,10 +14,19 @@ else()
     set(SDL3_TARGET SDL3::SDL3)
 endif()
 
-# Generamos el ejecutable con el nombre del proyecto
-add_executable(${PROJECT_NAME} src/main.cpp)
+
+# Declaración de ejecutables y fuentes
+add_executable(${PROJECT_NAME}
+src/main.cpp
+src/Vector2.hpp
+src/Component.hpp
+src/GameObject.hpp
+src/TransformComponent.hpp
+src/RectRenderComponent.hpp
+src/PlayerControllerComponent.hpp
+)
+
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 target_link_libraries(${PROJECT_NAME} PRIVATE ${SDL3_TARGET})
-
 
 

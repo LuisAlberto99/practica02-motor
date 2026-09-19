@@ -1,17 +1,18 @@
 #define SDL_MAIN_USE_CALLBACKS 1
 
+#include <vector>
+#include <memory>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+
 #include "Vector2.hpp"
+#include "GameObject.hpp"
+#include "TransformComponent.hpp"
+#include "RectRenderComponent.hpp"
+#include "PlayerControllerComponent.hpp"
 
 void SDL_LogPlatformInfo();
-struct Character
-{
-    Vector2 position{440.0f, 240.0f};
-    Vector2 size{60.0f, 60.0f};
-    float speed{300.0f};
-    SDL_Color color{60, 180, 100, 255};
-};
+
 struct AppState
 {
     SDL_Renderer *renderer{nullptr};
@@ -19,15 +20,10 @@ struct AppState
 
     // Temporizador para Delta Time
     Uint64 last_ticks{0};
-
-    // Posición del jugador usando Vector2
-    //Vector2 player_pos{440.0f, 240.0f};
-    //float rect_width{60.0f};
-    //float rect_height{60.0f};
-    //float speed{300.0f}; // Píxeles por segundo
-    Character player;
-
     float physics_accumulator{0.0f};
+
+    // Colección de todas las entidades activas en el mundo
+    std::vector<std::unique_ptr<GameObject>> entities;
 } appstate;
 
 SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
@@ -38,15 +34,13 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
         return SDL_APP_FAILURE;
     }
 
-    // Sugerir a la plataforma una tasa objetivo de 60 FPS
     SDL_SetHint(SDL_HINT_MAIN_CALLBACK_RATE, "60");
-
     SDL_LogPlatformInfo();
 
     SDL_Window *window = nullptr;
     SDL_Renderer *renderer = nullptr;
 
-    if (!SDL_CreateWindowAndRenderer("Práctica 02 - Vectores y Movimiento", 960, 540, SDL_WINDOW_RESIZABLE, &window, &renderer))
+    if (!SDL_CreateWindowAndRenderer("Práctica 03 - GameObject y Componentes", 960, 540, SDL_WINDOW_RESIZABLE, &window, &renderer))
     {
         SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "Error al crear ventana o renderer: %s", SDL_GetError());
         return SDL_APP_FAILURE;
@@ -58,38 +52,23 @@ SDL_AppResult SDL_AppInit(void **appstate, int argc, char **argv)
     ::appstate.renderer = renderer;
     ::appstate.last_ticks = SDL_GetTicks();
 
+    // --- Ensamblamos al Jugador por composición ---
+    auto player = std::make_unique<GameObject>("Player");
+    player->AddComponent<TransformComponent>(Vector2{440.0f, 240.0f}, Vector2{1.0f, 1.0f});
+    player->AddComponent<RectRenderComponent>(Vector2{60.0f, 60.0f}, SDL_Color{60, 180, 100, 255});
+    player->AddComponent<PlayerControllerComponent>(300.0f, true);
+    ::appstate.entities.push_back(std::move(player));
+
+    // --- Entidad Obstáculo: reutiliza Transform y RectRender, sin PlayerController ---
+    auto obstacle = std::make_unique<GameObject>("Obstacle");
+    obstacle->AddComponent<TransformComponent>(Vector2{150.0f, 120.0f}, Vector2{1.5f, 1.5f});
+    obstacle->AddComponent<RectRenderComponent>(Vector2{40.0f, 40.0f}, SDL_Color{220, 70, 70, 255});
+    ::appstate.entities.push_back(std::move(obstacle));
+
     *appstate = &::appstate;
     return SDL_APP_CONTINUE;
 }
 
-//void PhysicsUpdate(Character &character, const Vector2 &direction, float fixed_dt)
-//{
-//    Vector2 displacement = direction * (character.speed * fixed_dt);
-//    character.position = character.position + displacement;
-//}
-void PhysicsUpdate(Character &character, const Vector2 &direction, float fixed_dt)
-{
-    Vector2 displacement = direction * (character.speed * fixed_dt);
-    character.position = character.position + displacement;
-
-    // Clamping: confinar el personaje dentro de la ventana (960x540)
-    if (character.position.x < 0.0f)
-    {
-        character.position.x = 0.0f;
-    }
-    if (character.position.x > 960.0f - character.size.x)
-    {
-        character.position.x = 960.0f - character.size.x;
-    }
-    if (character.position.y < 0.0f)
-    {
-        character.position.y = 0.0f;
-    }
-    if (character.position.y > 540.0f - character.size.y)
-    {
-        character.position.y = 540.0f - character.size.y;
-    }
-}
 SDL_AppResult SDL_AppIterate(void *appstate)
 {
     AppState *app = static_cast<AppState *>(appstate);
@@ -99,49 +78,32 @@ SDL_AppResult SDL_AppIterate(void *appstate)
     float delta_time = static_cast<float>(current_ticks - app->last_ticks) / 1000.0f;
     app->last_ticks = current_ticks;
 
-    // Evitar saltos de tiempo excesivos si el sistema operativo pausa el proceso
     if (delta_time > 0.05f)
     {
         delta_time = 0.05f;
     }
 
-    // 2. Fase de Actualización (Update)
-    const bool *keys = SDL_GetKeyboardState(nullptr);
+    // 2. Fase de Actualización (timestep fijo)
+    constexpr float FIXED_TIMESTEP = 1.0f / 60.0f;
+    app->physics_accumulator += delta_time;
 
-    Vector2 input_dir{0.0f, 0.0f};
-    if (keys[SDL_SCANCODE_W] || keys[SDL_SCANCODE_UP])    input_dir.y -= 1.0f;
-    if (keys[SDL_SCANCODE_S] || keys[SDL_SCANCODE_DOWN])  input_dir.y += 1.0f;
-    if (keys[SDL_SCANCODE_A] || keys[SDL_SCANCODE_LEFT])  input_dir.x -= 1.0f;
-    if (keys[SDL_SCANCODE_D] || keys[SDL_SCANCODE_RIGHT]) input_dir.x += 1.0f;
-
-    // Normalización: si el jugador se está moviendo, normalizamos el vector
-    if (input_dir.length_squared() > 0.0f)
+    while (app->physics_accumulator >= FIXED_TIMESTEP)
     {
-        input_dir = input_dir.normalized();
+        for (auto &entity : app->entities)
+        {
+            entity->Update(FIXED_TIMESTEP);
+        }
+        app->physics_accumulator -= FIXED_TIMESTEP;
     }
 
-    // Calculamos el desplazamiento: velocidad escalar * dirección unitaria * delta_time
-    //Vector2 displacement = input_dir * (app->speed * delta_time);
-    //app->player_pos = app->player_pos + displacement;
-    //Vector2 displacement = input_dir * (app->player.speed * delta_time);
-    //app->player.position = app->player.position + displacement;
-    constexpr float FIXED_TIMESTEP = 1.0f / 60.0f; // 60 Hz estables
-app->physics_accumulator += delta_time;
-
-while (app->physics_accumulator >= FIXED_TIMESTEP)
-{
-    PhysicsUpdate(app->player, input_dir, FIXED_TIMESTEP);
-    app->physics_accumulator -= FIXED_TIMESTEP;
-}
     // 3. Fase de Renderizado
-    SDL_SetRenderDrawColor(app->renderer, 30, 30, 35, 255);
+    SDL_SetRenderDrawColor(app->renderer, 25, 25, 30, 255);
     SDL_RenderClear(app->renderer);
 
-    //SDL_SetRenderDrawColor(app->renderer, 60, 180, 100, 255);
-    //SDL_FRect player_rect{app->player.position.x, app->player.position.y, app->player.size.x, app->player.size.y};
-    SDL_SetRenderDrawColor(app->renderer, app->player.color.r, app->player.color.g, app->player.color.b, app->player.color.a);
-SDL_FRect player_rect{app->player.position.x, app->player.position.y, app->player.size.x, app->player.size.y};
-    SDL_RenderFillRect(app->renderer, &player_rect);
+    for (auto &entity : app->entities)
+    {
+        entity->Render(app->renderer);
+    }
 
     SDL_RenderPresent(app->renderer);
 
@@ -162,6 +124,7 @@ void SDL_AppQuit(void *appstate, SDL_AppResult result)
     AppState *app = static_cast<AppState *>(appstate);
     if (app)
     {
+        app->entities.clear();
         SDL_DestroyRenderer(app->renderer);
         SDL_DestroyWindow(app->window);
     }

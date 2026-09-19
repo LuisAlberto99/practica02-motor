@@ -44,4 +44,12 @@ struct Vector2
         }
         return {0.0f, 0.0f};
     }
+    
+    Vector2 clamp(const Vector2 &min, const Vector2 &max) const
+    {
+        Vector2 result;
+        result.x = x < min.x ? min.x : (x > max.x ? max.x : x);
+        result.y = y < min.y ? min.y : (y > max.y ? max.y : y);
+        return result;
+    }
 };
