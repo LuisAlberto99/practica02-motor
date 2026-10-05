@@ -31,4 +31,4 @@ public:
             velocity.x = std::abs(velocity.x);
         }//continuar...
     }
-}
+};
