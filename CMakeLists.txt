@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(practica04_motor LANGUAGES CXX)
+project(practica05_motor LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -27,6 +27,13 @@ src/PlayerControllerComponent.hpp
 src/ColliderComponent.hpp
 src/CollisionManager.hpp
 src/BallComponent.hpp
+src/Scene.hpp
+src/SceneManager.hpp
+src/TitleScene.hpp
+src/GameScene.hpp
+src/PauseScene.hpp
+src/GameOverScene.hpp
+
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE src)
