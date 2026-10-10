@@ -40,6 +40,11 @@ class SceneManager
 
         void PopScene()
         {
+            m_pendingAction = SceneAction::Pop;
+        }
+
+        void Clear()
+        {
             m_pendingAction = SceneAction::Clear;
         }
 
